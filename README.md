@@ -74,10 +74,10 @@ says which span moved it.
 
 ```bash
 cp .env.example .env
-make up                                   # redis, mlflow, otel, prometheus, grafana
-make train                                # trains and registers fraud-scorer
-make serve                                # in another shell
-make worker                               # in a third
+./run.sh up                               # redis, mlflow, otel, prometheus, grafana
+./run.sh train                            # trains and registers fraud-scorer
+./run.sh serve                            # in another shell
+./run.sh worker                           # in a third
 curl -s localhost:8000/predict -H 'content-type: application/json' -d '{
   "instances": [{"amount": 240.5, "hour_of_day": 3, "merchant_risk": 0.8,
                  "account_age_days": 12, "txn_count_24h": 9,
@@ -90,7 +90,7 @@ Grafana is at `localhost:3000`, Prometheus at `localhost:9090`, MLflow at
 ## Load test
 
 ```bash
-make load
+./run.sh load
 ```
 
 Weighted 20:3:1 across single predictions, batches of 16 to 256, and health
@@ -102,3 +102,16 @@ scored at authorisation time, with periodic rescoring batches on top.
 `pytest -q`. The one worth reading is `test_schema_contract.py`, for the
 reason in the first section: it is the failure that produces no error
 anywhere.
+
+## Known issues
+
+- The drift reference is loaded from an MLflow artifact at deploy time, which
+  means a rollback to an older model version compares its scores against the
+  newer model's reference. PSI is nonsense until the next deploy. Noticed
+  during a rollback rehearsal; not fixed.
+- `/predict/{task_id}` exists for polling but nothing calls it. The sync path
+  blocks on `result.get(timeout=30)` instead, which ties up a worker thread
+  for the duration. Fine at current volume, wrong at 10x.
+- Celery `task_acks_late` plus a 50s soft limit means a worker killed mid-batch
+  redelivers the whole batch. Idempotent here because inference has no side
+  effects, but it would not be if scores were written anywhere.

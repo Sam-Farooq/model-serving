@@ -81,6 +81,9 @@ async def predict(req: PredictRequest) -> PredictResponse:
         else:
             path = "celery"
             result = predict_task.delay(vectors)
+            # FIXME: blocking get on an async handler. Works because the worker
+            # pool is sized well above concurrent batch requests, but it is
+            # holding a thread for up to 30s and should be polled instead.
             try:
                 payload = result.get(timeout=30)
             except Exception as exc:  # noqa: BLE001

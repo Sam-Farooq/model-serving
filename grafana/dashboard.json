@@ -1,0 +1,51 @@
+{
+  "title": "model-serving",
+  "uid": "model-serving",
+  "refresh": "10s",
+  "panels": [
+    {
+      "title": "p50 / p95 / p99 latency by path",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum(rate(prediction_latency_seconds_bucket[5m])) by (le, path))", "legendFormat": "p50 {{path}}"},
+        {"expr": "histogram_quantile(0.95, sum(rate(prediction_latency_seconds_bucket[5m])) by (le, path))", "legendFormat": "p95 {{path}}"},
+        {"expr": "histogram_quantile(0.99, sum(rate(prediction_latency_seconds_bucket[5m])) by (le, path))", "legendFormat": "p99 {{path}}"}
+      ]
+    },
+    {
+      "title": "Throughput by model version",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "targets": [
+        {"expr": "sum(rate(predictions_total[5m])) by (model_version)", "legendFormat": "v{{model_version}}"}
+      ]
+    },
+    {
+      "title": "Score PSI against deploy reference",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 0.1},
+              {"color": "red", "value": 0.2}
+            ]
+          }
+        }
+      },
+      "targets": [{"expr": "prediction_score_psi", "legendFormat": "PSI"}]
+    },
+    {
+      "title": "Batch size distribution",
+      "type": "heatmap",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {"expr": "sum(rate(prediction_batch_size_bucket[5m])) by (le)", "format": "heatmap"}
+      ]
+    }
+  ]
+}

@@ -28,5 +28,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
       - run: pip install torch --index-url https://download.pytorch.org/whl/cpu && pip install -e ".[dev]"
-      # Train against a local file store so the smoke test needs no server.
-      - run: MS_MLFLOW_URI=file:///tmp/mlruns python train/train.py --epochs 3
+      # sqlite, not a file store. MLflow now raises on the filesystem backend
+      # rather than warning, so file:// fails outright. sqlite needs no server
+      # and is what MLflow points you at.
+      - run: MS_MLFLOW_URI=sqlite:///$RUNNER_TEMP/mlflow.db python train/train.py --epochs 3

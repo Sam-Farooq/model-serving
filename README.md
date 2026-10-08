@@ -105,10 +105,11 @@ anywhere.
 
 ## Known issues
 
-- The drift reference is loaded from an MLflow artifact at deploy time, which
-  means a rollback to an older model version compares its scores against the
-  newer model's reference. PSI is nonsense until the next deploy. Noticed
-  during a rollback rehearsal; not fixed.
+- Nothing actually loads the drift reference. `DriftMonitor` takes one and
+  `api.py` constructs it with none, so `current_psi()` returns None forever
+  and `prediction_score_psi` is never set. Training writes a reference array
+  to MLflow and the serving side never reads it back. This is the largest gap
+  in the repo and it is not subtle once you look for it.
 - `/predict/{task_id}` exists for polling but nothing calls it. The sync path
   blocks on `result.get(timeout=30)` instead, which ties up a worker thread
   for the duration. Fine at current volume, wrong at 10x.

@@ -9,3 +9,4 @@ mlruns/
 mlartifacts/
 *.npy
 .DS_Store
+.mypy_cache/

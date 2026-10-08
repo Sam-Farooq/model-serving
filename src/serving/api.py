@@ -18,10 +18,15 @@ from serving.config import get_settings
 from serving.drift import DriftMonitor
 from serving.model.predictor import predict_batch, to_labels
 from serving.model.registry import load
-from serving.schemas import FEATURE_ORDER, PredictRequest, PredictResponse, Prediction
+from serving.schemas import FEATURE_ORDER, Prediction, PredictRequest, PredictResponse
 from serving.tasks import predict_task
 from serving.telemetry import (
-    BATCH_SIZE, LATENCY, MODEL_INFO, PREDICTIONS, SCORE_PSI, setup_tracing,
+    BATCH_SIZE,
+    LATENCY,
+    MODEL_INFO,
+    PREDICTIONS,
+    SCORE_PSI,
+    setup_tracing,
 )
 
 logging.basicConfig(level=logging.INFO)

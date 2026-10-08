@@ -1,5 +1,4 @@
 import pytest
-import torch
 from torch import nn
 
 from serving.config import get_settings

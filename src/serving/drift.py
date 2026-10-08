@@ -34,14 +34,17 @@ class DriftMonitor:
     def __init__(self, reference: list[float] | None = None):
         cfg = get_settings()
         self.threshold = cfg.drift_psi_threshold
-        self.window: deque[float] = deque(maxlen=cfg.drift_window)
+        # Kept alongside the deque because deque.maxlen is Optional[int], and
+        # the fullness check below has to compare against a plain int.
+        self.window_size = cfg.drift_window
+        self.window: deque[float] = deque(maxlen=self.window_size)
         self.reference = np.asarray(reference) if reference else None
 
     def observe(self, scores: list[float]) -> None:
         self.window.extend(scores)
 
     def current_psi(self) -> float | None:
-        if self.reference is None or len(self.window) < self.window.maxlen:
+        if self.reference is None or len(self.window) < self.window_size:
             return None
         return psi(self.reference, np.asarray(self.window))
 

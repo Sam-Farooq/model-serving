@@ -32,5 +32,5 @@ def test_monitor_reports_nothing_until_the_window_is_full():
 def test_monitor_fires_once_the_window_fills_with_shifted_scores():
     rng = np.random.default_rng(2)
     monitor = DriftMonitor(reference=list(rng.beta(2, 8, 2000)))
-    monitor.observe(list(rng.beta(8, 2, monitor.window.maxlen)))
+    monitor.observe(list(rng.beta(8, 2, monitor.window_size)))
     assert monitor.is_drifting() is True

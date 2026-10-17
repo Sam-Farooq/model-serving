@@ -34,7 +34,10 @@ def load() -> tuple[torch.nn.Module, str, list[str]]:
 
         client = mlflow.MlflowClient()
         versions = client.get_latest_versions(cfg.model_name, stages=[cfg.model_stage])
-        version = versions[0].version if versions else "unknown"
+        # str(): the registry hands the version back as an int, and it is
+        # returned to the client in a field typed as a string. Pydantic
+        # refuses it at the last line of the handler, after the forward pass.
+        version = str(versions[0].version) if versions else "unknown"
 
         # Feature order travels with the artifact. Reading it back and checking
         # it against the serving schema is what stops a silent reordering from

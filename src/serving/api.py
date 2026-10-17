@@ -17,11 +17,12 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from serving.config import get_settings
 from serving.drift import DriftMonitor
 from serving.model.predictor import predict_batch, to_labels
-from serving.model.registry import load
+from serving.model.registry import load, load_score_reference
 from serving.schemas import FEATURE_ORDER, Prediction, PredictRequest, PredictResponse
 from serving.tasks import predict_task
 from serving.telemetry import (
     BATCH_SIZE,
+    DRIFT_REFERENCE_SIZE,
     LATENCY,
     MODEL_INFO,
     PREDICTIONS,
@@ -47,7 +48,16 @@ async def lifespan(app: FastAPI):
             f"feature order mismatch: artifact={feature_order} serving={FEATURE_ORDER}"
         )
 
-    runtime.update(model=model, version=version, tracer=tracer, drift=DriftMonitor())
+    # Without this the monitor has nothing to compare against, current_psi()
+    # returns None on every call and prediction_score_psi is never exported.
+    reference = load_score_reference()
+    if reference is None:
+        log.warning("drift monitor has no reference: prediction_score_psi stays unexported")
+    DRIFT_REFERENCE_SIZE.set(len(reference) if reference else 0)
+
+    runtime.update(
+        model=model, version=version, tracer=tracer, drift=DriftMonitor(reference)
+    )
     MODEL_INFO.labels(model_name=cfg.model_name, version=version).set(1)
     log.info("serving %s version=%s", cfg.model_name, version)
     yield

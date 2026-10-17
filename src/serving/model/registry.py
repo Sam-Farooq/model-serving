@@ -11,9 +11,11 @@ import logging
 import threading
 
 import mlflow
+import numpy as np
 import torch
 
 from serving.config import get_settings
+from serving.drift import SCORE_REFERENCE_ARTIFACT
 
 log = logging.getLogger(__name__)
 _lock = threading.Lock()
@@ -45,9 +47,54 @@ def load() -> tuple[torch.nn.Module, str, list[str]]:
         run = client.get_run(versions[0].run_id) if versions else None
         order = (run.data.params.get("feature_order", "") or "").split(",") if run else []
 
-        _state.update(model=model, version=version, feature_order=[f for f in order if f])
+        _state.update(
+            model=model,
+            version=version,
+            feature_order=[f for f in order if f],
+            # Pinned with the model: the drift reference has to come from the
+            # run that produced this version.
+            run_id=versions[0].run_id if versions else None,
+        )
         log.info("loaded %s version=%s", cfg.model_name, version)
         return model, version, _state["feature_order"]
+
+
+def load_score_reference() -> list[float] | None:
+    """The validation score distribution logged by the run behind the model.
+
+    Pinned the same way the model is, and taken from that version's own run
+    rather than the newest one. A rollback otherwise compares the old model
+    against the new model's reference and reports drift that is nothing but
+    the rollback itself.
+
+    A run with no reference artifact returns None. A missing reference is a
+    hole in monitoring, not a wrong answer, so the process serves on and says
+    so in the log and in `drift_reference_size`.
+    """
+    load()
+    with _lock:
+        if "reference" in _state:
+            return _state["reference"]
+
+        run_id = _state.get("run_id")
+        reference: list[float] | None = None
+        if run_id is None:
+            log.warning("no registry version behind the model, so no drift reference")
+        else:
+            try:
+                path = mlflow.artifacts.download_artifacts(
+                    run_id=run_id, artifact_path=SCORE_REFERENCE_ARTIFACT
+                )
+                reference = np.load(path).astype(float).ravel().tolist()
+                log.info("drift reference: %d scores from run %s", len(reference), run_id)
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "run %s has no %s, so PSI cannot be computed: %s",
+                    run_id, SCORE_REFERENCE_ARTIFACT, exc,
+                )
+
+        _state["reference"] = reference
+        return reference
 
 
 def reset() -> None:

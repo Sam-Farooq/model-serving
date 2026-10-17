@@ -48,9 +48,9 @@ is exported as `prediction_score_psi` and the Grafana panel is banded at those
 thresholds.
 
 A version with no reference artifact does not stop the process. The monitor
-stays quiet and `drift_reference_size` reads 0, because on a dashboard an
-unexported PSI series looks exactly like a calm one, which is how a monitor
-with nothing to compare against stayed invisible here.
+stays quiet and `drift_reference_size` reads 0, which is the only way to tell
+that state apart from a calm one: a PSI gauge that is never set still exports,
+as a flat 0, and a flat 0 on the panel reads as perfect stability.
 
 ## Why average precision, not ROC-AUC
 

@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI):
     # returns None on every call and prediction_score_psi is never exported.
     reference = load_score_reference()
     if reference is None:
-        log.warning("drift monitor has no reference: prediction_score_psi stays unexported")
+        log.warning("drift monitor has no reference: prediction_score_psi stays at 0")
     DRIFT_REFERENCE_SIZE.set(len(reference) if reference else 0)
 
     runtime.update(

@@ -7,12 +7,18 @@ matter.
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Sequence
 
 import numpy as np
 
 from serving.config import get_settings
 
 BINS = np.linspace(0.0, 1.0, 11)
+
+# The one name for the reference distribution. `train/train.py` logs it under
+# this path and `model/registry.py` downloads it back under the same one; the
+# whole monitor is dead if those two spellings ever part company.
+SCORE_REFERENCE_ARTIFACT = "score_reference.npy"
 
 
 def psi(reference: np.ndarray, current: np.ndarray, eps: float = 1e-6) -> float:
@@ -31,14 +37,21 @@ class DriftMonitor:
     depends on how noisy the upstream traffic is.
     """
 
-    def __init__(self, reference: list[float] | None = None):
+    def __init__(self, reference: Sequence[float] | np.ndarray | None = None):
         cfg = get_settings()
         self.threshold = cfg.drift_psi_threshold
         # Kept alongside the deque because deque.maxlen is Optional[int], and
         # the fullness check below has to compare against a plain int.
         self.window_size = cfg.drift_window
         self.window: deque[float] = deque(maxlen=self.window_size)
-        self.reference = np.asarray(reference) if reference else None
+        # Length, not truthiness: `if reference` raises ValueError on an array
+        # of more than one element, and the caller passes through whatever the
+        # registry read back.
+        self.reference = (
+            np.asarray(reference, dtype=float)
+            if reference is not None and len(reference) > 0
+            else None
+        )
 
     def observe(self, scores: list[float]) -> None:
         self.window.extend(scores)

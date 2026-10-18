@@ -38,10 +38,19 @@ the convenience of a hot reload. Rolling a version is a deployment.
 **Input distribution moving.** Labels arrive days later, if at all. Scores
 arrive now, and they move first.
 
-`drift.py` keeps a 1,000-score rolling window and computes PSI against a
-reference captured at deploy time. Under 0.1 is stable, 0.1 to 0.2 is worth a
-look, over 0.2 is a real shift. It is exported as `prediction_score_psi` and
-the Grafana panel is banded at those thresholds.
+`drift.py` keeps a 1,000-score rolling window and computes PSI against the
+validation score distribution the training run logged, `score_reference.npy`.
+Startup downloads it from the run behind the pinned model version, not from
+the newest run: a rollback has to be measured against the reference belonging
+to the version it rolled back to, or the monitor fires on the rollback itself.
+Under 0.1 is stable, 0.1 to 0.2 is worth a look, over 0.2 is a real shift. It
+is exported as `prediction_score_psi` and the Grafana panel is banded at those
+thresholds.
+
+A version with no reference artifact does not stop the process. The monitor
+stays quiet and `drift_reference_size` reads 0, which is the only way to tell
+that state apart from a calm one: a PSI gauge that is never set still exports,
+as a flat 0, and a flat 0 on the panel reads as perfect stability.
 
 ## Why average precision, not ROC-AUC
 
@@ -64,6 +73,7 @@ predictions_total{model_version, path}
 prediction_latency_seconds{path}          histogram, 5ms to 2.5s
 prediction_batch_size                     histogram, 1 to 512
 prediction_score_psi                      gauge
+drift_reference_size                      gauge, 0 when none was loaded
 model_info{model_name, version}
 ```
 
@@ -105,11 +115,17 @@ anywhere.
 
 ## Known issues
 
-- Nothing actually loads the drift reference. `DriftMonitor` takes one and
-  `api.py` constructs it with none, so `current_psi()` returns None forever
-  and `prediction_score_psi` is never set. Training writes a reference array
-  to MLflow and the serving side never reads it back. This is the largest gap
-  in the repo and it is not subtle once you look for it.
+- The drift reference is read once at startup and pinned, like the model. A
+  reference relogged onto the same run is not picked up until a restart.
+- `./run.sh train` cannot register a model against MLflow 3.17.
+  `mlflow.pytorch.log_model` now defaults to the pt2 serialization format and
+  refuses to save without an `input_example`; supply one and the artifact
+  loads back as a traced graph whose `eval()` raises `NotImplementedError`,
+  which is the next line `registry.load()` runs. Pickle still round-trips,
+  but `serialization_format` is absent from 2.16, 3.0 and 3.1, so asking for
+  it explicitly means raising the floor in `pyproject.toml` and that is its
+  own change. Training without `--register` is unaffected, which is why CI
+  stayed green.
 - `/predict/{task_id}` exists for polling but nothing calls it. The sync path
   blocks on `result.get(timeout=30)` instead, which ties up a worker thread
   for the duration. Fine at current volume, wrong at 10x.

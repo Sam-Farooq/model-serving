@@ -28,6 +28,10 @@ BATCH_SIZE = Histogram(
     buckets=(1, 2, 4, 8, 16, 32, 64, 128, 256, 512),
 )
 SCORE_PSI = Gauge("prediction_score_psi", "PSI of served scores against deploy reference")
+# Zero means the monitor is running with nothing to compare against, which is
+# how that state hid: an unset PSI gauge still exports, as a flat 0, and a
+# flat 0 on the dashboard reads as perfect stability.
+DRIFT_REFERENCE_SIZE = Gauge("drift_reference_size", "Scores in the loaded drift reference")
 MODEL_INFO = Gauge("model_info", "Loaded model version", ["model_name", "version"])
 
 

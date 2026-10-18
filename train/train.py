@@ -10,6 +10,8 @@ cheap defence against a reordering that would otherwise be silent.
 from __future__ import annotations
 
 import argparse
+import tempfile
+from pathlib import Path
 
 import mlflow
 import numpy as np
@@ -20,6 +22,7 @@ from sklearn.model_selection import train_test_split
 from torch import nn
 
 from serving.config import get_settings
+from serving.drift import SCORE_REFERENCE_ARTIFACT
 from serving.schemas import FEATURE_ORDER
 
 
@@ -100,9 +103,13 @@ def main() -> None:
         mlflow.log_metrics(metrics)
         print(metrics)
 
-        # The reference distribution the drift monitor compares against.
-        np.save("/tmp/score_reference.npy", scores)
-        mlflow.log_artifact("/tmp/score_reference.npy")
+        # The reference distribution the drift monitor compares against. The
+        # filename is the contract with the serving side, which downloads it
+        # from this run, so it comes from one constant rather than a literal
+        # at each end.
+        reference = Path(tempfile.mkdtemp()) / SCORE_REFERENCE_ARTIFACT
+        np.save(reference, scores)
+        mlflow.log_artifact(str(reference))
 
         if args.register:
             mlflow.pytorch.log_model(model, "model", registered_model_name=cfg.model_name)
